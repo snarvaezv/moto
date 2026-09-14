@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NX-190 · Control de moto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --honda-red: #E2001A;
+    --honda-red-dark: #970012;
+    --honda-red-deep: #5C000B;
+    --white: #FFFFFF;
+    --off-white: #F7F4F2;
+    --line: #ECE3E1;
+    --graphite: #201818;
+    --grey-mid: #8C7C7A;
+    --radius: 14px;
+  }
+  *{ box-sizing: border-box; margin:0; padding:0; }
+  body{
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--off-white);
+    color: var(--graphite);
+    -webkit-font-smoothing: antialiased;
+  }
+  .app{ max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--white); }
+
+  /* ---- Hero ---- */
+  .hero{
+    position: relative;
+    background: var(--honda-red);
+    background-image:
+      linear-gradient(rgba(255,255,255,.10) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.10) 1px, transparent 1px);
+    background-size: 22px 22px;
+    color: var(--white);
+    padding: 28px 22px 22px;
+    overflow: hidden;
+  }
+  .hero::after{
+    content:"";
+    position:absolute; inset:0;
+    background: linear-gradient(180deg, transparent 40%, var(--honda-red-dark) 130%);
+    pointer-events:none;
+  }
+  .hero-top{ display:flex; justify-content:space-between; align-items:flex-start; position:relative; z-index:1; }
+  .hero-model{ font-family:'Rajdhani', sans-serif; font-weight:700; font-size: 28px; letter-spacing:.5px; line-height:1; }
+  .hero-plate{ font-size: 12px; opacity:.8; margin-top:4px; }
+  .hero-odo{ text-align:right; }
+  .hero-odo-value{ font-family:'Rajdhani', sans-serif; font-weight:600; font-size: 20px; }
+  .hero-odo-label{ font-size: 11px; opacity:.75; }
+
+  .hero-stats{ display:flex; gap:10px; margin-top: 22px; position:relative; z-index:1; }
+  .hero-stat{ flex:1; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: var(--radius); padding: 12px 8px; text-align:center; }
+  .hero-stat-value{ font-family:'Rajdhani', sans-serif; font-weight:700; font-size: 22px; line-height:1; }
+  .hero-stat-label{ font-size: 10.5px; opacity:.85; margin-top:4px; }
+  .hero-note{ font-size: 10.5px; opacity:.75; margin-top: 8px; position:relative; z-index:1; }
+
+  /* ---- Tabs ---- */
+  .tabs{
+    display:flex; overflow-x:auto;
+    border-bottom: 1px solid var(--line);
+    padding: 0 12px;
+    -ms-overflow-style:none; scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab{
+    flex: 0 0 auto;
+    padding: 14px 12px 12px;
+    font-size: 13.5px; font-weight:600; color: var(--grey-mid);
+    border-bottom: 2px solid transparent;
+    cursor:pointer; white-space:nowrap;
+  }
+  .tab.active{ color: var(--honda-red); border-bottom-color: var(--honda-red); }
+
+  .view{ display:none; padding: 18px 18px 90px; }
+  .view.active{ display:block; }
+
+  .section-title{ font-size: 13px; font-weight:600; color: var(--grey-mid); text-transform:none; margin: 6px 0 12px; }
+
+  /* ---- Life cards (mantenimiento) ---- */
+  .life-card{
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 12px; background: var(--white);
+  }
+  .life-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px; }
+  .life-name{ font-weight:600; font-size: 14.5px; }
+  .life-km{ font-size: 12px; color: var(--grey-mid); }
+  .life-bar{ height: 8px; border-radius: 5px; background: var(--off-white); overflow:hidden; }
+  .life-fill{ height:100%; background: var(--honda-red); border-radius:5px; }
+  .life-bottom{ display:flex; justify-content:space-between; margin-top: 8px; font-size: 11.5px; color: var(--grey-mid); }
+  .life-bottom strong{ color: var(--graphite); }
+  .life-date{ font-size: 11.5px; color: var(--honda-red); font-weight:600; margin-top:6px; }
+
+  .agendar-bar{
+    display:flex; justify-content:space-between; align-items:center;
+    background: var(--off-white); border:1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 14px; margin-bottom: 16px;
+  }
+  .agendar-text{ font-size: 12.5px; color: var(--grey-mid); }
+  .agendar-link{
+    color: var(--honda-red); font-weight:700; font-size: 13.5px; text-decoration:none;
+    display:flex; align-items:center; gap:5px; white-space:nowrap; margin-left:12px;
+  }
+  .agendar-link:active{ opacity:.7; }
+
+  /* ---- Fijos list ---- */
+  .fijo-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding: 13px 2px; border-bottom: 1px solid var(--line);
+  }
+  .fijo-row:last-child{ border-bottom:none; }
+  .fijo-name{ font-weight:600; font-size: 14px; }
+  .fijo-sub{ font-size: 11.5px; color: var(--grey-mid); margin-top:2px; }
+  .fijo-right{ text-align:right; }
+  .fijo-value{ font-family:'Rajdhani', sans-serif; font-weight:600; font-size: 15px; }
+  .fijo-date{ font-size: 11px; color: var(--honda-red); font-weight:600; margin-top:2px; }
+
+  /* ---- Forms (Tanqueo / Odómetro / Mantenimiento) ---- */
+  .field{ margin-bottom: 14px; }
+  .field label{ display:block; font-size: 12.5px; font-weight:600; color: var(--grey-mid); margin-bottom:6px; }
+  .field input, .field select{
+    width:100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 14.5px; font-family:'Inter',sans-serif; color: var(--graphite); background: var(--off-white);
+  }
+  .field input:focus, .field select:focus{ outline: none; border-color: var(--honda-red); }
+  .btn-primary{
+    width:100%; padding: 13px; border:none; border-radius: 10px;
+    background: var(--honda-red); color: var(--white); font-weight:600; font-size: 14.5px;
+    font-family:'Inter', sans-serif; cursor:pointer; margin-top: 4px;
+  }
+  .btn-primary:active{ background: var(--honda-red-dark); }
+
+  .history{ margin-top: 22px; }
+  .history-row{ display:flex; justify-content:space-between; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .history-row:last-child{ border-bottom:none; }
+  .history-date{ color: var(--grey-mid); }
+
+  /* ---- Ring (dashboard highlight) ---- */
+  .ring-wrap{ display:flex; align-items:center; gap:16px; border:1px solid var(--line); border-radius: var(--radius); padding:16px; margin-bottom: 18px; }
+  .ring-label{ flex:1; }
+  .ring-title{ font-weight:600; font-size:14px; margin-bottom:3px; }
+  .ring-sub{ font-size: 12px; color: var(--grey-mid); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="hero-model">NX-190</div>
+        <div class="hero-plate">Placa · ABC12D</div>
+      </div>
+      <div class="hero-odo">
+        <div class="hero-odo-value">27.300</div>
+        <div class="hero-odo-label">km actuales</div>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-value">$185</div>
+        <div class="hero-stat-label">$/km</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value">42</div>
+        <div class="hero-stat-label">km/día</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value">132</div>
+        <div class="hero-stat-label">km/galón*</div>
+      </div>
+    </div>
+    <div class="hero-note">*Estimado con precio de referencia $/galón (configurable)</div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="tanqueo">Tanqueo</div>
+    <div class="tab" data-tab="odometro">Odómetro</div>
+    <div class="tab" data-tab="mantenimiento">Mantenimiento</div>
+    <div class="tab" data-tab="fijos">Gastos fijos</div>
+    <div class="tab" data-tab="dashboard">Dashboard</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="view" id="view-dashboard">
+    <div class="ring-wrap">
+      <div class="ring-label">
+        <div class="ring-title">Kit de arrastre</div>
+        <div class="ring-sub">Es lo más próximo a cumplir su vida útil</div>
+      </div>
+      <div style="font-family:'Rajdhani',sans-serif; font-weight:700; font-size:22px; color:var(--honda-red);">89%</div>
+    </div>
+
+    <div class="section-title">Revisión periódica (taller)</div>
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Revisión 30.000 km</span><span class="life-km">27.300 / 30.000 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:55%"></div></div>
+      <div class="life-bottom"><span>Última: Revisión 24.000 km</span><strong>2.700 km restantes</strong></div>
+      <div class="life-date">Estimado ~ 13 nov 2026</div>
+    </div>
+
+    <div class="section-title">Vida útil de repuestos</div>
+
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Llantas</span><span class="life-km">27.300 / ~35.000 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:62%"></div></div>
+      <div class="life-bottom"><span>Instaladas a los 15.000 km</span><strong>38% restante</strong></div>
+      <div class="life-date">Estimado ~ 12 mar 2027</div>
+    </div>
+
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Pastillas de freno</span><span class="life-km">27.300 / 32.000 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:41%"></div></div>
+      <div class="life-bottom"><span>Instaladas a los 24.000 km</span><strong>59% restante</strong></div>
+      <div class="life-date">Estimado ~ 31 dic 2026</div>
+    </div>
+
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Kit de arrastre</span><span class="life-km">27.300 / 30.000 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:89%"></div></div>
+      <div class="life-bottom"><span>Instalado a los 5.000 km</span><strong>11% restante</strong></div>
+      <div class="life-date">Estimado ~ 13 nov 2026</div>
+    </div>
+
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Aceite motor</span><span class="life-km">27.300 / 27.500 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:87%"></div></div>
+      <div class="life-bottom"><span>Cambiado a los 26.000 km</span><strong>200 km restantes</strong></div>
+      <div class="life-date">Estimado ~ 15 sept 2026</div>
+    </div>
+
+    <div class="section-title" style="margin-top:22px;">Próximos vencimientos</div>
+    <div class="fijo-row">
+      <div><div class="fijo-name">SOAT</div><div class="fijo-sub">Anual</div></div>
+      <div class="fijo-right"><div class="fijo-value">$680.000</div><div class="fijo-date">15 dic 2026</div></div>
+    </div>
+    <div class="fijo-row">
+      <div><div class="fijo-name">Seguro todo riesgo</div><div class="fijo-sub">Mensual</div></div>
+      <div class="fijo-right"><div class="fijo-value">$95.000</div><div class="fijo-date">1 oct 2026</div></div>
+    </div>
+  </div>
+
+  <!-- TANQUEO -->
+  <div class="view active" id="view-tanqueo">
+    <div class="section-title">Nueva tanqueada</div>
+    <div class="field"><label>Fecha</label><input type="date"></div>
+    <div class="field"><label>Odómetro (km)</label><input type="number" placeholder="27.300"></div>
+    <div class="field"><label>Valor gastado</label><input type="number" placeholder="$40.000"></div>
+    <button class="btn-primary">Guardar tanqueo</button>
+
+    <div class="history">
+      <div class="section-title">Historial reciente</div>
+      <div class="history-row"><span>27.300 km · $40.000</span><span class="history-date">28 ago</span></div>
+      <div class="history-row"><span>26.980 km · $38.500</span><span class="history-date">22 ago</span></div>
+      <div class="history-row"><span>26.640 km · $40.000</span><span class="history-date">15 ago</span></div>
+    </div>
+  </div>
+
+  <!-- ODOMETRO -->
+  <div class="view" id="view-odometro">
+    <div class="section-title">Registrar odómetro</div>
+    <div class="field"><label>Fecha</label><input type="date"></div>
+    <div class="field"><label>Odómetro (km)</label><input type="number" placeholder="27.300"></div>
+    <button class="btn-primary">Guardar lectura</button>
+
+    <div class="history">
+      <div class="section-title">Historial reciente</div>
+      <div class="history-row"><span>27.300 km</span><span class="history-date">28 ago</span></div>
+      <div class="history-row"><span>27.010 km</span><span class="history-date">24 ago</span></div>
+      <div class="history-row"><span>26.640 km</span><span class="history-date">15 ago</span></div>
+    </div>
+  </div>
+
+  <!-- MANTENIMIENTO -->
+  <div class="view" id="view-mantenimiento">
+    <div class="section-title">Próxima cita estimada</div>
+    <div class="agendar-bar">
+      <span class="agendar-text">Revisión 30.000 km (taller) · ~13 nov 2026<br>según tu promedio de 42 km/día</span>
+      <a class="agendar-link" href="https://qanty.com/portals/appointments?c=Jg3fxkJo2aKYr6iD4IdL" target="_blank" rel="noopener">Agendar cita →</a>
+    </div>
+
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Revisión 30.000 km</span><span class="life-km">27.300 / 30.000 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:55%"></div></div>
+      <div class="life-bottom"><span>Última: Revisión 24.000 km</span><strong>2.700 km restantes</strong></div>
+      <div class="life-date">Estimado ~ 13 nov 2026</div>
+    </div>
+
+    <div class="section-title" style="margin-top:22px;">Vida útil de repuestos</div>
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Llantas</span><span class="life-km">27.300 / ~35.000 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:62%"></div></div>
+      <div class="life-bottom"><span>Instaladas a los 15.000 km</span><strong>38% restante</strong></div>
+      <div class="life-date">Estimado ~ 12 mar 2027</div>
+    </div>
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Pastillas de freno</span><span class="life-km">27.300 / 32.000 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:41%"></div></div>
+      <div class="life-bottom"><span>Instaladas a los 24.000 km</span><strong>59% restante</strong></div>
+      <div class="life-date">Estimado ~ 31 dic 2026</div>
+    </div>
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Kit de arrastre</span><span class="life-km">27.300 / 30.000 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:89%"></div></div>
+      <div class="life-bottom"><span>Instalado a los 5.000 km</span><strong>11% restante</strong></div>
+      <div class="life-date">Estimado ~ 13 nov 2026</div>
+    </div>
+    <div class="life-card">
+      <div class="life-top"><span class="life-name">Aceite motor</span><span class="life-km">27.300 / 27.500 km</span></div>
+      <div class="life-bar"><div class="life-fill" style="width:87%"></div></div>
+      <div class="life-bottom"><span>Cambiado a los 26.000 km</span><strong>200 km restantes</strong></div>
+      <div class="life-date">Estimado ~ 15 sept 2026</div>
+    </div>
+
+    <div class="section-title" style="margin-top:22px;">Nuevo mantenimiento</div>
+    <div class="field"><label>Fecha</label><input type="date"></div>
+    <div class="field"><label>Odómetro (km)</label><input type="number" placeholder="27.300"></div>
+    <div class="field">
+      <label>Tipo de registro</label>
+      <select>
+        <optgroup label="Revisión periódica (taller)">
+          <option>Cambio de aceite</option>
+          <option>Mantenimiento general</option>
+          <option>Servicios especiales</option>
+          <option>Revisión 1.000 km</option>
+          <option>Revisión 3.000 km</option>
+          <option>Revisión 6.000 km</option>
+          <option>Revisión 9.000 km</option>
+          <option>Revisión 12.000 km</option>
+          <option>Revisión 12.000 km (frecuencia 6.000 km)</option>
+          <option>Revisión 15.000 km</option>
+          <option>Revisión 18.000 km</option>
+          <option>Revisión 18.000 km (frecuencia 6.000 km)</option>
+          <option>Revisión 21.000 km</option>
+          <option>Revisión 24.000 km</option>
+          <option>Revisión 24.000 km (frecuencia 6.000 km)</option>
+          <option>Revisión 27.000 km</option>
+          <option>Revisión 30.000 km</option>
+        </optgroup>
+        <optgroup label="Cambio de repuesto">
+          <option>Llantas</option>
+          <option>Kit de arrastre</option>
+          <option>Pastillas de freno</option>
+          <option>Aceite motor</option>
+          <option>Filtro de aire</option>
+          <option>Bujía</option>
+          <option>Batería</option>
+          <option>Otro</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="field"><label>Valor</label><input type="number" placeholder="$350.000"></div>
+    <div class="field"><label>Taller / nota</label><input type="text" placeholder="Opcional"></div>
+    <button class="btn-primary">Guardar mantenimiento</button>
+
+    <div class="history">
+      <div class="section-title">Historial reciente</div>
+      <div class="history-row"><span>Revisión 24.000 km</span><span class="history-date">24.000 km</span></div>
+      <div class="history-row"><span>Kit de arrastre · $280.000</span><span class="history-date">5.000 km</span></div>
+      <div class="history-row"><span>Pastillas de freno · $95.000</span><span class="history-date">24.000 km</span></div>
+      <div class="history-row"><span>Llantas · $520.000</span><span class="history-date">15.000 km</span></div>
+    </div>
+  </div>
+
+  <!-- FIJOS -->
+  <div class="view" id="view-fijos">
+    <div class="section-title">Nuevo gasto fijo</div>
+    <div class="field"><label>Fecha</label><input type="date"></div>
+    <div class="field">
+      <label>Tipo</label>
+      <select>
+        <option>SOAT</option>
+        <option>Seguro todo riesgo</option>
+        <option>Pico y placa / Impuesto</option>
+        <option>Tecnomecánica</option>
+      </select>
+    </div>
+    <div class="field"><label>Valor</label><input type="number" placeholder="$95.000"></div>
+    <div class="field">
+      <label>Periodicidad</label>
+      <select>
+        <option>Mensual</option>
+        <option>Anual</option>
+        <option>Única vez</option>
+      </select>
+    </div>
+    <button class="btn-primary">Guardar gasto</button>
+
+    <div class="history">
+      <div class="section-title">Vigentes</div>
+      <div class="fijo-row">
+        <div><div class="fijo-name">SOAT</div><div class="fijo-sub">Anual</div></div>
+        <div class="fijo-right"><div class="fijo-value">$680.000</div><div class="fijo-date">15 dic 2026</div></div>
+      </div>
+      <div class="fijo-row">
+        <div><div class="fijo-name">Seguro todo riesgo</div><div class="fijo-sub">Mensual</div></div>
+        <div class="fijo-right"><div class="fijo-value">$95.000</div><div class="fijo-date">1 oct 2026</div></div>
+      </div>
+      <div class="fijo-row">
+        <div><div class="fijo-name">Pico y placa / Impuesto</div><div class="fijo-sub">Anual</div></div>
+        <div class="fijo-right"><div class="fijo-value">$210.000</div><div class="fijo-date">30 jun 2027</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('view-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
