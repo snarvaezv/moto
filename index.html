@@ -213,6 +213,9 @@
     <div class="section-title">Revisión periódica (taller)</div>
     <div id="revisionCardDash"></div>
 
+    <div class="section-title">Mantenimiento rutinario</div>
+    <div id="rutinasListDash"></div>
+
     <div class="section-title">Vida útil de repuestos</div>
     <div id="repuestosListDash"></div>
 
@@ -257,6 +260,9 @@
 
     <div id="revisionCardMan"></div>
 
+    <div class="section-title" style="margin-top:22px;">Mantenimiento rutinario</div>
+    <div id="rutinasListMan"></div>
+
     <div class="section-title" style="margin-top:22px;">Vida útil de repuestos</div>
     <div id="repuestosListMan"></div>
 
@@ -267,23 +273,20 @@
       <label>Tipo de registro</label>
       <select id="manItem">
         <optgroup label="Revisión periódica (taller)" data-tipo="Revision periodica">
+          <option>Revisión 1.000 km</option>
+          <option>Revisión 6.000 km</option>
+          <option>Revisión 12.000 km</option>
+          <option>Revisión 18.000 km</option>
+          <option>Revisión 24.000 km</option>
+          <option>Revisión 30.000 km</option>
+          <option>Revisión 36.000 km</option>
           <option>Cambio de aceite</option>
           <option>Mantenimiento general</option>
           <option>Servicios especiales</option>
-          <option>Revisión 1.000 km</option>
-          <option>Revisión 3.000 km</option>
-          <option>Revisión 6.000 km</option>
-          <option>Revisión 9.000 km</option>
-          <option>Revisión 12.000 km</option>
-          <option>Revisión 12.000 km (frecuencia 6.000 km)</option>
-          <option>Revisión 15.000 km</option>
-          <option>Revisión 18.000 km</option>
-          <option>Revisión 18.000 km (frecuencia 6.000 km)</option>
-          <option>Revisión 21.000 km</option>
-          <option>Revisión 24.000 km</option>
-          <option>Revisión 24.000 km (frecuencia 6.000 km)</option>
-          <option>Revisión 27.000 km</option>
-          <option>Revisión 30.000 km</option>
+        </optgroup>
+        <optgroup label="Mantenimiento rutinario" data-tipo="Revision periodica">
+          <option>Lubricar cadena de transmisión</option>
+          <option>Líquido de frenos</option>
         </optgroup>
         <optgroup label="Cambio de repuesto" data-tipo="Cambio de repuesto">
           <option>Llantas</option>
@@ -350,6 +353,9 @@
     { nombre: 'Kit de arrastre', key: 'VidaUtilKitArrastre' },
     { nombre: 'Pastillas de freno', key: 'VidaUtilPastillas' },
     { nombre: 'Aceite motor', key: 'VidaUtilAceite' }
+  ];
+  const RUTINAS = [
+    { nombre: 'Lubricar cadena de transmisión', key: 'VidaUtilLubricacionCadena', tipoRegistro: 'Revision periodica' }
   ];
   const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
@@ -433,7 +439,8 @@
   }
 
   function vidaUtilInfo(rep){
-    const ultimo = ultimoRegistro(DATA.mantenimientos, m => m.TipoRegistro === 'Cambio de repuesto' && m.Item === rep.nombre);
+    const tipoRegistro = rep.tipoRegistro || 'Cambio de repuesto';
+    const ultimo = ultimoRegistro(DATA.mantenimientos, m => m.TipoRegistro === tipoRegistro && m.Item === rep.nombre);
     const kmInstalacion = ultimo ? num(ultimo.Odometro) : 0;
     const vidaUtil = num(DATA.config[rep.key]);
     const actual = currentOdometer();
@@ -447,8 +454,9 @@
 
   function proximaRevision(){
     const actual = currentOdometer();
-    const objetivo = actual < 1000 ? 1000 : Math.ceil((actual + 1) / 3000) * 3000;
-    const ultima = ultimoRegistro(DATA.mantenimientos, m => m.TipoRegistro === 'Revision periodica');
+    // Manual real: 1.000 km (rodaje), luego cada 6.000 km (6, 12, 18, 24, 30, 36...) indefinidamente.
+    const objetivo = actual < 1000 ? 1000 : Math.ceil((actual + 1) / 6000) * 6000;
+    const ultima = ultimoRegistro(DATA.mantenimientos, m => m.TipoRegistro === 'Revision periodica' && /^Revisión\s+[\d.]+\s*km/i.test(m.Item||''));
     const kmUltima = ultima ? num(ultima.Odometro) : 0;
     const base = objetivo > kmUltima ? kmUltima : 0;
     const pct = (objetivo - base) > 0 ? Math.min(100, Math.max(0, ((actual - base) / (objetivo - base)) * 100)) : 0;
@@ -521,6 +529,17 @@
     return infos;
   }
 
+  function renderRutinasCards(containerId){
+    const infos = RUTINAS.map(vidaUtilInfo);
+    document.getElementById(containerId).innerHTML = infos.map(i => lifeCardHtml(
+      i.nombre, i.actual, i.objetivo, i.pct,
+      i.ultimo ? `Última vez a los ${fmtInt(i.kmInstalacion)} km` : 'Sin registro aún',
+      i.vidaUtil ? `${fmtInt(i.restanteKm)} km restantes` : 'Configura el ciclo',
+      i.fecha
+    )).join('');
+    return infos;
+  }
+
   function renderRevisionCard(containerId){
     const r = proximaRevision();
     document.getElementById(containerId).innerHTML = lifeCardHtml(
@@ -534,11 +553,13 @@
 
   function renderDashboard(){
     const revision = renderRevisionCard('revisionCardDash');
+    const rutinas = renderRutinasCards('rutinasListDash');
     const repuestos = renderRepuestosCards('repuestosListDash');
 
-    // Ítem destacado: el más próximo entre revisión y repuestos
+    // Ítem destacado: el más próximo entre revisión, rutinas y repuestos
     const candidatos = [
       { nombre: `Revisión ${fmtInt(revision.objetivo)} km`, pct: revision.pct },
+      ...rutinas.map(r => ({ nombre: r.nombre, pct: r.pct })),
       ...repuestos.map(r => ({ nombre: r.nombre, pct: r.pct }))
     ];
     candidatos.sort((a,b) => b.pct - a.pct);
@@ -559,11 +580,13 @@
 
   function renderMantenimiento(){
     const revision = renderRevisionCard('revisionCardMan');
+    const rutinas = renderRutinasCards('rutinasListMan');
     const repuestos = renderRepuestosCards('repuestosListMan');
     renderMantenimientoHistorial();
 
     const candidatos = [
       { nombre: `Revisión ${fmtInt(revision.objetivo)} km`, restanteKm: revision.restanteKm, fecha: revision.fecha },
+      ...rutinas.map(r => ({ nombre: r.nombre, restanteKm: r.restanteKm, fecha: r.fecha })),
       ...repuestos.map(r => ({ nombre: r.nombre, restanteKm: r.restanteKm, fecha: r.fecha }))
     ];
     candidatos.sort((a,b) => a.restanteKm - b.restanteKm);
