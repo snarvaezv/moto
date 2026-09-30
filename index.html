@@ -165,6 +165,10 @@
   .ring-label{ flex:1; }
   .ring-title{ font-weight:600; font-size:14px; margin-bottom:3px; }
   .ring-sub{ font-size: 12px; color: var(--grey-mid); }
+  .total-cost-box{ display:flex; justify-content:space-between; align-items:center; background:var(--off-white); border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; margin-bottom:20px; }
+  .total-cost-label{ font-weight:600; font-size:13.5px; }
+  .total-cost-sub{ font-size:11px; color:var(--grey-mid); margin-top:2px; }
+  .total-cost-value{ font-family:'Rajdhani',sans-serif; font-weight:700; font-size:19px; color:var(--honda-red); white-space:nowrap; margin-left:10px; }
 </style>
 </head>
 <body>
@@ -188,7 +192,7 @@
     <div class="hero-stats">
       <div class="hero-stat">
         <div class="hero-stat-value" id="statCostoKm">—</div>
-        <div class="hero-stat-label">$/km</div>
+        <div class="hero-stat-label">$/km gasolina</div>
       </div>
       <div class="hero-stat">
         <div class="hero-stat-value" id="statKmDia">—</div>
@@ -218,6 +222,14 @@
         <div class="ring-sub" id="ringSub">Cargando…</div>
       </div>
       <div id="ringPct" style="font-family:'Rajdhani',sans-serif; font-weight:700; font-size:22px; color:var(--honda-red);">—</div>
+    </div>
+
+    <div class="total-cost-box">
+      <div>
+        <div class="total-cost-label">Costo total de rodamiento</div>
+        <div class="total-cost-sub">Gasolina + mantenimiento + gastos fijos</div>
+      </div>
+      <div class="total-cost-value" id="statCostoKmTotal">—/km</div>
     </div>
 
     <div class="section-title">Revisión periódica (taller)</div>
@@ -435,7 +447,12 @@
     return pts[pts.length-1].km - pts[0].km;
   }
   function suma(arr, campo){ return (arr||[]).reduce((s,x) => s + num(x[campo]), 0); }
-  function costoPorKm(){
+  function costoPorKmCombustible(){
+    const km = totalKmRecorridos();
+    if(!km) return 0;
+    return suma(DATA.tanqueos, 'ValorGastado') / km;
+  }
+  function costoPorKmTotal(){
     const km = totalKmRecorridos();
     if(!km) return 0;
     const gasto = suma(DATA.tanqueos,'ValorGastado') + suma(DATA.mantenimientos,'Valor') + suma(DATA.gastosFijos,'Valor');
@@ -515,7 +532,7 @@
     document.getElementById('heroModel').textContent = DATA.config.Modelo || 'NX-190';
     document.getElementById('heroPlate').textContent = 'Placa · ' + (DATA.config.Placa || '—');
     document.getElementById('heroOdoValue').textContent = fmtInt(currentOdometer());
-    document.getElementById('statCostoKm').textContent = totalKmRecorridos() ? fmtMoney(costoPorKm()) : '—';
+    document.getElementById('statCostoKm').textContent = totalKmRecorridos() ? fmtMoney(costoPorKmCombustible()) : '—';
     document.getElementById('statKmDia').textContent = kmPerDay() ? fmtInt(kmPerDay()) : '—';
     document.getElementById('statKmGalon').textContent = kmPorGalonEstimado() ? fmtInt(kmPorGalonEstimado()) : '—';
     document.getElementById('heroNote').textContent = '*Estimado con precio de referencia $/galón (configurable)';
@@ -570,6 +587,7 @@
   }
 
   function renderDashboard(){
+    document.getElementById('statCostoKmTotal').textContent = totalKmRecorridos() ? fmtMoney(costoPorKmTotal()) + '/km' : '—/km';
     const revision = renderRevisionCard('revisionCardDash');
     const rutinas = renderRutinasCards('rutinasListDash');
     const repuestos = renderRepuestosCards('repuestosListDash');
@@ -625,16 +643,23 @@
   }
 
   /* ---------- Fetch / Guardado ---------- */
+  function fetchWithTimeout(url, options, ms){
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+  }
+
   async function fetchData(){
     const dot = document.getElementById('connDot');
     dot.className = 'conn-dot loading';
     try{
-      const res = await fetch(API_URL);
+      const res = await fetchWithTimeout(API_URL, {}, 20000);
       DATA = await res.json();
       render();
       dot.className = 'conn-dot ok';
     }catch(err){
-      document.getElementById('heroNote').textContent = 'No se pudo cargar el Sheet — revisa la conexión';
+      const msg = err.name === 'AbortError' ? 'El Sheet está tardando demasiado — intenta de nuevo' : 'No se pudo cargar el Sheet — revisa la conexión';
+      document.getElementById('heroNote').textContent = msg;
       dot.className = 'conn-dot error';
     }
   }
@@ -646,13 +671,13 @@
     btn.disabled = true;
     try{
       const body = new URLSearchParams({ tipo, ...fields });
-      await fetch(API_URL, { method: 'POST', body });
+      await fetchWithTimeout(API_URL, { method: 'POST', body }, 20000);
       await fetchData();
       btn.textContent = 'Guardado ✓';
     }catch(err){
-      btn.textContent = 'Error, intenta de nuevo';
+      btn.textContent = err.name === 'AbortError' ? 'Tardó demasiado, reintenta' : 'Error, intenta de nuevo';
     }
-    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1500);
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1800);
   }
 
   document.getElementById('btnTanqueo').addEventListener('click', () => {
