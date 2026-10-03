@@ -128,17 +128,6 @@
   }
   .agendar-link:active{ opacity:.7; }
 
-  /* ---- Fijos list ---- */
-  .fijo-row{
-    display:flex; justify-content:space-between; align-items:center;
-    padding: 13px 2px; border-bottom: 1px solid var(--line);
-  }
-  .fijo-row:last-child{ border-bottom:none; }
-  .fijo-name{ font-weight:600; font-size: 14px; }
-  .fijo-sub{ font-size: 11.5px; color: var(--grey-mid); margin-top:2px; }
-  .fijo-right{ text-align:right; }
-  .fijo-value{ font-family:'Rajdhani', sans-serif; font-weight:600; font-size: 15px; }
-  .fijo-date{ font-size: 11px; color: var(--honda-red); font-weight:600; margin-top:2px; }
 
   /* ---- Forms (Tanqueo / Odómetro / Mantenimiento) ---- */
   .field{ margin-bottom: 14px; }
@@ -165,10 +154,6 @@
   .ring-label{ flex:1; }
   .ring-title{ font-weight:600; font-size:14px; margin-bottom:3px; }
   .ring-sub{ font-size: 12px; color: var(--grey-mid); }
-  .total-cost-box{ display:flex; justify-content:space-between; align-items:center; background:var(--off-white); border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; margin-bottom:20px; }
-  .total-cost-label{ font-weight:600; font-size:13.5px; }
-  .total-cost-sub{ font-size:11px; color:var(--grey-mid); margin-top:2px; }
-  .total-cost-value{ font-family:'Rajdhani',sans-serif; font-weight:700; font-size:19px; color:var(--honda-red); white-space:nowrap; margin-left:10px; }
 </style>
 </head>
 <body>
@@ -207,10 +192,9 @@
   </div>
 
   <div class="tabs">
-    <div class="tab active" data-tab="tanqueo">Tanqueo</div>
-    <div class="tab" data-tab="odometro">Odómetro</div>
+    <div class="tab active" data-tab="odometro">Odómetro</div>
+    <div class="tab" data-tab="tanqueo">Tanqueo</div>
     <div class="tab" data-tab="mantenimiento">Mantenimiento</div>
-    <div class="tab" data-tab="fijos">Gastos fijos</div>
     <div class="tab" data-tab="dashboard">Dashboard</div>
   </div>
 
@@ -224,14 +208,6 @@
       <div id="ringPct" style="font-family:'Rajdhani',sans-serif; font-weight:700; font-size:22px; color:var(--honda-red);">—</div>
     </div>
 
-    <div class="total-cost-box">
-      <div>
-        <div class="total-cost-label">Costo total de rodamiento</div>
-        <div class="total-cost-sub">Gasolina + mantenimiento + gastos fijos</div>
-      </div>
-      <div class="total-cost-value" id="statCostoKmTotal">—/km</div>
-    </div>
-
     <div class="section-title">Revisión periódica (taller)</div>
     <div id="revisionCardDash"></div>
 
@@ -240,17 +216,14 @@
 
     <div class="section-title">Vida útil de repuestos</div>
     <div id="repuestosListDash"></div>
-
-    <div class="section-title" style="margin-top:22px;">Próximos vencimientos</div>
-    <div id="fijosListDash"></div>
   </div>
 
   <!-- TANQUEO -->
-  <div class="view active" id="view-tanqueo">
+  <div class="view" id="view-tanqueo">
     <div class="section-title">Nueva tanqueada</div>
     <div class="field"><label>Fecha</label><input type="date" id="tqFecha"></div>
-    <div class="field"><label>Odómetro (km)</label><input type="number" id="tqOdometro" placeholder="27300"></div>
-    <div class="field"><label>Valor gastado</label><input type="number" id="tqValor" placeholder="40000"></div>
+    <div class="field"><label>Odómetro (km)</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="tqOdometro" placeholder="27300"></div>
+    <div class="field"><label>Valor gastado</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="tqValor" placeholder="40000"></div>
     <button class="btn-primary" id="btnTanqueo">Guardar tanqueo</button>
 
     <div class="history">
@@ -260,10 +233,10 @@
   </div>
 
   <!-- ODOMETRO -->
-  <div class="view" id="view-odometro">
+  <div class="view active" id="view-odometro">
     <div class="section-title">Registrar odómetro</div>
     <div class="field"><label>Fecha</label><input type="date" id="odFecha"></div>
-    <div class="field"><label>Odómetro (km)</label><input type="number" id="odKm" placeholder="27300"></div>
+    <div class="field"><label>Odómetro (km)</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="odKm" placeholder="27300"></div>
     <button class="btn-primary" id="btnOdometro">Guardar lectura</button>
 
     <div class="history">
@@ -290,7 +263,7 @@
 
     <div class="section-title" style="margin-top:22px;">Nuevo mantenimiento</div>
     <div class="field"><label>Fecha</label><input type="date" id="manFecha"></div>
-    <div class="field"><label>Odómetro (km)</label><input type="number" id="manOdometro" placeholder="27300"></div>
+    <div class="field"><label>Odómetro (km)</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="manOdometro" placeholder="27300"></div>
     <div class="field">
       <label>Tipo de registro</label>
       <select id="manItem">
@@ -322,7 +295,7 @@
         </optgroup>
       </select>
     </div>
-    <div class="field"><label>Valor</label><input type="number" id="manValor" placeholder="350000"></div>
+    <div class="field"><label>Valor</label><input type="text" inputmode="numeric" pattern="[0-9]*" id="manValor" placeholder="350000"></div>
     <div class="field"><label>Taller / nota</label><input type="text" id="manNota" placeholder="Opcional"></div>
     <button class="btn-primary" id="btnMantenimiento">Guardar mantenimiento</button>
 
@@ -332,43 +305,13 @@
     </div>
   </div>
 
-  <!-- FIJOS -->
-  <div class="view" id="view-fijos">
-    <div class="section-title">Nuevo gasto fijo</div>
-    <div class="field"><label>Fecha de pago</label><input type="date" id="fijoFecha"></div>
-    <div class="field">
-      <label>Tipo</label>
-      <select id="fijoTipo">
-        <option>SOAT</option>
-        <option>Seguro todo riesgo</option>
-        <option>Pico y placa / Impuesto</option>
-        <option>Tecnomecánica</option>
-      </select>
-    </div>
-    <div class="field"><label>Valor</label><input type="number" id="fijoValor" placeholder="95000"></div>
-    <div class="field">
-      <label>Periodicidad</label>
-      <select id="fijoPeriodicidad">
-        <option>Mensual</option>
-        <option>Anual</option>
-        <option>Única vez</option>
-      </select>
-    </div>
-    <div class="field"><label>Próximo vencimiento</label><input type="date" id="fijoProximoVencimiento"></div>
-    <button class="btn-primary" id="btnFijo">Guardar gasto</button>
-
-    <div class="history">
-      <div class="section-title">Vigentes</div>
-      <div id="fijosListFull"><div class="history-row"><span>Cargando…</span></div></div>
-    </div>
-  </div>
 
 </div>
 
 <script>
   const API_URL = "https://script.google.com/macros/s/AKfycbxoE-i7rJwBPr_KH7yUNBmOrJn9hB2F0uzUBKUbirQVA9pvXyc9rdHzdel6ij6S8r7GhA/exec";
 
-  let DATA = { config: {}, tanqueos: [], odometro: [], mantenimientos: [], gastosFijos: [] };
+  let DATA = { config: {}, tanqueos: [], odometro: [], mantenimientos: [] };
 
   const REPUESTOS = [
     { nombre: 'Llantas', key: 'VidaUtilLlantas' },
@@ -452,12 +395,6 @@
     if(!km) return 0;
     return suma(DATA.tanqueos, 'ValorGastado') / km;
   }
-  function costoPorKmTotal(){
-    const km = totalKmRecorridos();
-    if(!km) return 0;
-    const gasto = suma(DATA.tanqueos,'ValorGastado') + suma(DATA.mantenimientos,'Valor') + suma(DATA.gastosFijos,'Valor');
-    return gasto / km;
-  }
   function kmPorGalonEstimado(){
     const precioGalon = num(DATA.config.PrecioReferenciaGalon);
     const gastoComb = suma(DATA.tanqueos, 'ValorGastado');
@@ -510,12 +447,6 @@
       <div class="life-date">${fecha ? 'Estimado ~ ' + fmtDate(fecha) : 'Aún sin datos suficientes para estimar fecha'}</div>
     </div>`;
   }
-  function fijoRowHtml(f){
-    return `<div class="fijo-row">
-      <div><div class="fijo-name">${f.Tipo||''}</div><div class="fijo-sub">${f.Periodicidad||''}</div></div>
-      <div class="fijo-right"><div class="fijo-value">${fmtMoney(f.Valor)}</div><div class="fijo-date">${fmtDate(toDate(f.ProximoVencimiento))}</div></div>
-    </div>`;
-  }
   function emptyMsg(texto){ return `<div class="history-row"><span style="color:var(--grey-mid)">${texto}</span></div>`; }
 
   /* ---------- Render principal ---------- */
@@ -525,7 +456,6 @@
     renderHistorial('tanqueoHistory', DATA.tanqueos, t => `${fmtInt(t.Odometro)} km · ${fmtMoney(t.ValorGastado)}`, t => t.Fecha);
     renderHistorial('odometroHistory', DATA.odometro, o => `${fmtInt(o.Km)} km`, o => o.Fecha);
     renderMantenimiento();
-    renderFijos();
   }
 
   function renderHero(){
@@ -587,7 +517,6 @@
   }
 
   function renderDashboard(){
-    document.getElementById('statCostoKmTotal').textContent = totalKmRecorridos() ? fmtMoney(costoPorKmTotal()) + '/km' : '—/km';
     const revision = renderRevisionCard('revisionCardDash');
     const rutinas = renderRutinasCards('rutinasListDash');
     const repuestos = renderRepuestosCards('repuestosListDash');
@@ -603,15 +532,6 @@
     document.getElementById('ringTitle').textContent = top ? top.nombre : '—';
     document.getElementById('ringSub').textContent = 'Es lo más próximo a cumplir su vida útil';
     document.getElementById('ringPct').textContent = top ? Math.round(top.pct) + '%' : '—';
-
-    const fijosOrdenados = [...(DATA.gastosFijos||[])]
-      .map(f => ({...f, _venc: toDate(f.ProximoVencimiento)}))
-      .filter(f => f._venc)
-      .sort((a,b) => a._venc - b._venc)
-      .slice(0,3);
-    document.getElementById('fijosListDash').innerHTML = fijosOrdenados.length
-      ? fijosOrdenados.map(fijoRowHtml).join('')
-      : emptyMsg('Aún no hay gastos fijos registrados');
   }
 
   function renderMantenimiento(){
@@ -631,15 +551,6 @@
     document.getElementById('agendarText').innerHTML = proximo
       ? `${proximo.nombre} · ${proximo.fecha ? '~' + fmtDate(proximo.fecha) : 'fecha por estimar'}<br>${kmdia ? 'según tu promedio de ' + fmtInt(kmdia) + ' km/día' : 'necesitamos más registros de km/día'}`
       : 'Aún no hay suficientes datos';
-  }
-
-  function renderFijos(){
-    const fijosOrdenados = [...(DATA.gastosFijos||[])]
-      .map(f => ({...f, _venc: toDate(f.ProximoVencimiento)}))
-      .sort((a,b) => (a._venc||0) - (b._venc||0));
-    document.getElementById('fijosListFull').innerHTML = fijosOrdenados.length
-      ? fijosOrdenados.map(fijoRowHtml).join('')
-      : emptyMsg('Aún no hay gastos fijos registrados');
   }
 
   /* ---------- Fetch / Guardado ---------- */
@@ -707,16 +618,6 @@
       Valor: document.getElementById('manValor').value,
       Nota: document.getElementById('manNota').value
     }, 'btnMantenimiento');
-  });
-
-  document.getElementById('btnFijo').addEventListener('click', () => {
-    postEntry('gastoFijo', {
-      Fecha: document.getElementById('fijoFecha').value,
-      Tipo: document.getElementById('fijoTipo').value,
-      Valor: document.getElementById('fijoValor').value,
-      Periodicidad: document.getElementById('fijoPeriodicidad').value,
-      ProximoVencimiento: document.getElementById('fijoProximoVencimiento').value
-    }, 'btnFijo');
   });
 
   fetchData();
