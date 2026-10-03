@@ -136,6 +136,13 @@
     width:100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
     font-size: 16px; font-family:'Inter',sans-serif; color: var(--graphite); background: var(--off-white);
   }
+  /* iOS: el campo de fecha tiene un ancho mínimo propio y se sale de la pantalla */
+  .field input[type="date"]{
+    -webkit-appearance: none; appearance: none;
+    display: block; min-width: 0; max-width: 100%;
+    min-height: 46px; text-align: left;
+  }
+  .field input[type="date"]::-webkit-date-and-time-value{ text-align: left; }
   .field input:focus, .field select:focus{ outline: none; border-color: var(--honda-red); }
   .btn-primary{
     width:100%; padding: 13px; border:none; border-radius: 10px;
@@ -384,24 +391,31 @@
     if(days <= 0) return 0;
     return (last.km - first.km) / days;
   }
-  function totalKmRecorridos(){
-    const pts = odometerPoints();
-    if(pts.length < 2) return 0;
-    return pts[pts.length-1].km - pts[0].km;
-  }
   function suma(arr, campo){ return (arr||[]).reduce((s,x) => s + num(x[campo]), 0); }
+  // Combustible tanqueo a tanqueo: la gasolina de cada tanqueo paga los km recorridos
+  // desde el tanqueo anterior. Por eso se excluye el primer tanqueo y los km se cuentan
+  // solo entre el primer y el último tanqueo (la gasolina del último aún está en el tanque).
+  function tramoCombustible(){
+    const tq = (DATA.tanqueos||[])
+      .map(t => ({ km: num(t.Odometro), valor: num(t.ValorGastado) }))
+      .filter(t => t.km)
+      .sort((a,b) => a.km - b.km);
+    if(tq.length < 2) return null;
+    const km = tq[tq.length-1].km - tq[0].km;
+    if(km <= 0) return null;
+    const gasto = tq.slice(1).reduce((s,t) => s + t.valor, 0);
+    return { km, gasto };
+  }
   function costoPorKmCombustible(){
-    const km = totalKmRecorridos();
-    if(!km) return 0;
-    return suma(DATA.tanqueos, 'ValorGastado') / km;
+    const tramo = tramoCombustible();
+    return tramo ? tramo.gasto / tramo.km : 0;
   }
   function kmPorGalonEstimado(){
     const precioGalon = num(DATA.config.PrecioReferenciaGalon);
-    const gastoComb = suma(DATA.tanqueos, 'ValorGastado');
-    const km = totalKmRecorridos();
-    if(!precioGalon || !gastoComb || !km) return 0;
-    const galones = gastoComb / precioGalon;
-    return km / galones;
+    const tramo = tramoCombustible();
+    if(!precioGalon || !tramo || !tramo.gasto) return 0;
+    const galones = tramo.gasto / precioGalon;
+    return tramo.km / galones;
   }
 
   function ultimoRegistro(lista, filtro){
@@ -462,7 +476,7 @@
     document.getElementById('heroModel').textContent = DATA.config.Modelo || 'NX-190';
     document.getElementById('heroPlate').textContent = 'Placa · ' + (DATA.config.Placa || '—');
     document.getElementById('heroOdoValue').textContent = fmtInt(currentOdometer());
-    document.getElementById('statCostoKm').textContent = totalKmRecorridos() ? fmtMoney(costoPorKmCombustible()) : '—';
+    document.getElementById('statCostoKm').textContent = costoPorKmCombustible() ? fmtMoney(costoPorKmCombustible()) : '—';
     document.getElementById('statKmDia').textContent = kmPerDay() ? fmtInt(kmPerDay()) : '—';
     document.getElementById('statKmGalon').textContent = kmPorGalonEstimado() ? fmtInt(kmPorGalonEstimado()) : '—';
     document.getElementById('heroNote').textContent = '*Estimado con precio de referencia $/galón (configurable)';
