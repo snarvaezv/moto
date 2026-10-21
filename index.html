@@ -165,6 +165,28 @@
   .history-row:last-child{ border-bottom:none; }
   .history-date{ color: var(--grey-mid); }
 
+  /* ---- Gráfica km acumulado ---- */
+  .km-chart{ margin-top: 22px; border:1px solid var(--line); border-radius: var(--radius); padding: 14px 14px 10px; }
+  .km-chart-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 8px; }
+  .km-chart-title{ font-weight:600; font-size: 14px; }
+  .km-chart-sub{ font-size: 11.5px; color: var(--grey-mid); margin-top:2px; }
+  .km-chart-total{ font-family:'Rajdhani', sans-serif; font-weight:700; font-size: 18px; color: var(--graphite); white-space:nowrap; }
+  .km-chart-plot{ position:relative; touch-action: pan-y; -webkit-user-select:none; user-select:none; }
+  .km-chart-plot svg{ display:block; width:100%; height:auto; overflow:visible; }
+  .km-chart-plot .grid{ stroke: var(--line); stroke-width:1; }
+  .km-chart-plot .axis-label{ fill: var(--grey-mid); font-size: 10px; font-family:'Inter',sans-serif; }
+  .km-chart-plot .line{ fill:none; stroke: var(--honda-red); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+  .km-chart-plot .area{ fill: var(--honda-red); opacity:.07; }
+  .km-chart-plot .dot{ fill: var(--honda-red); stroke: var(--white); stroke-width:2; }
+  .km-chart-plot .cross{ stroke: var(--grey-mid); stroke-width:1; stroke-dasharray:3 3; }
+  .km-chart-tip{
+    position:absolute; top:0; transform: translateX(-50%); pointer-events:none;
+    background: var(--graphite); color: var(--white); border-radius: 8px; padding: 5px 8px;
+    font-size: 11.5px; line-height:1.3; white-space:nowrap; text-align:center;
+  }
+  .km-chart-tip[hidden]{ display:none; }
+  .km-chart-tip strong{ font-family:'Rajdhani', sans-serif; font-size: 14px; }
+
   /* ---- Ring (dashboard highlight) ---- */
   .ring-wrap{ display:flex; align-items:center; gap:16px; border:1px solid var(--line); border-radius: var(--radius); padding:16px; margin-bottom: 18px; }
   .ring-label{ flex:1; }
@@ -265,6 +287,17 @@
     <div class="history">
       <div class="section-title">Historial reciente</div>
       <div id="odometroHistory"><div class="history-row"><span>Cargando…</span></div></div>
+    </div>
+
+    <div class="km-chart" id="kmChart" hidden>
+      <div class="km-chart-head">
+        <div>
+          <div class="km-chart-title">Km acumulado</div>
+          <div class="km-chart-sub" id="kmChartSub"></div>
+        </div>
+        <div class="km-chart-total" id="kmChartTotal"></div>
+      </div>
+      <div class="km-chart-plot" id="kmChartPlot"></div>
     </div>
   </div>
 
@@ -500,6 +533,7 @@
     renderDashboard();
     renderHistorial('tanqueoHistory', DATA.tanqueos, t => `${fmtInt(t.Odometro)} km · ${fmtMoney(t.ValorGastado)}`, t => t.Fecha);
     renderHistorial('odometroHistory', DATA.odometro, o => `${fmtInt(o.Km)} km`, o => o.Fecha);
+    renderKmChart();
     renderMantenimiento();
   }
 
@@ -526,6 +560,72 @@
     if(!lista || !lista.length){ el.innerHTML = emptyMsg('Aún no hay registros'); return; }
     const ordenado = [...lista].map(r => ({...r, _fecha: toDate(fechaFn(r))})).sort((a,b) => (b._fecha||0) - (a._fecha||0)).slice(0,6);
     el.innerHTML = ordenado.map(r => `<div class="history-row"><span>${textoFn(r)}</span><span class="history-date">${fmtDate(r._fecha)}</span></div>`).join('');
+  }
+
+  /* ---------- Gráfica km acumulado vs tiempo ---------- */
+  function renderKmChart(){
+    const box = document.getElementById('kmChart');
+    // Un punto por día (el km más alto registrado ese día), de todas las fuentes.
+    const porDia = new Map();
+    odometerPoints().forEach(p => {
+      const k = p.fecha.getTime();
+      if(!porDia.has(k) || porDia.get(k).km < p.km) porDia.set(k, p);
+    });
+    const pts = [...porDia.values()].sort((a,b) => a.fecha - b.fecha);
+    if(pts.length < 2){ box.hidden = true; return; }
+    box.hidden = false;
+
+    const first = pts[0], last = pts[pts.length-1];
+    document.getElementById('kmChartSub').textContent = `Desde ${fmtDate(first.fecha)}`;
+    document.getElementById('kmChartTotal').textContent = '+' + fmtInt(last.km - first.km) + ' km';
+
+    const W = 340, H = 160, L = 44, R = 10, T = 34, B = 22;
+    const t0 = first.fecha.getTime(), t1 = last.fecha.getTime();
+    const paso = [50, 100, 200, 250, 500, 1000, 2000, 5000].find(p => (last.km - first.km) / p <= 4) || 10000;
+    const yMin = Math.floor(first.km / paso) * paso;
+    const yMax = Math.max(yMin + paso, Math.ceil(last.km / paso) * paso);
+    const x = t => L + (t - t0) / ((t1 - t0) || 1) * (W - L - R);
+    const y = km => T + (1 - (km - yMin) / (yMax - yMin)) * (H - T - B);
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Km acumulado de ${fmtInt(first.km)} a ${fmtInt(last.km)} km entre ${fmtDate(first.fecha)} y ${fmtDate(last.fecha)}">`;
+    for(let v = yMin; v <= yMax; v += paso){
+      svg += `<line class="grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/>`;
+      svg += `<text class="axis-label" x="${L-6}" y="${y(v)+3.5}" text-anchor="end">${fmtInt(v)}</text>`;
+    }
+    const corta = d => d.getDate() + ' ' + MESES[d.getMonth()];
+    svg += `<text class="axis-label" x="${L}" y="${H-4}" text-anchor="start">${corta(first.fecha)}</text>`;
+    svg += `<text class="axis-label" x="${W-R}" y="${H-4}" text-anchor="end">${corta(last.fecha)}</text>`;
+    const linea = pts.map((p,i) => `${i ? 'L' : 'M'}${x(p.fecha.getTime()).toFixed(1)},${y(p.km).toFixed(1)}`).join('');
+    svg += `<path class="area" d="${linea}L${x(t1)},${y(yMin)}L${x(t0)},${y(yMin)}Z"/>`;
+    svg += `<path class="line" d="${linea}"/>`;
+    if(pts.length <= 40) pts.forEach(p => { svg += `<circle class="dot" cx="${x(p.fecha.getTime())}" cy="${y(p.km)}" r="4"/>`; });
+    svg += `<line class="cross" id="kmCross" y1="${T}" y2="${H-B}" visibility="hidden"/>`;
+    svg += `<circle class="dot" id="kmFocus" r="5" visibility="hidden"/>`;
+    svg += `</svg><div class="km-chart-tip" id="kmTip" hidden></div>`;
+
+    const plot = document.getElementById('kmChartPlot');
+    plot.innerHTML = svg;
+    const svgEl = plot.querySelector('svg'), cross = plot.querySelector('#kmCross'),
+          focus = plot.querySelector('#kmFocus'), tip = plot.querySelector('#kmTip');
+
+    const mostrar = ev => {
+      const r = svgEl.getBoundingClientRect();
+      const sx = (ev.clientX - r.left) * W / r.width;
+      let i = 0;
+      pts.forEach((p,j) => { if(Math.abs(x(p.fecha.getTime()) - sx) < Math.abs(x(pts[i].fecha.getTime()) - sx)) i = j; });
+      const p = pts[i], px = x(p.fecha.getTime()), py = y(p.km);
+      cross.setAttribute('x1', px); cross.setAttribute('x2', px); cross.setAttribute('visibility', 'visible');
+      focus.setAttribute('cx', px); focus.setAttribute('cy', py); focus.setAttribute('visibility', 'visible');
+      const prev = pts[i-1];
+      tip.innerHTML = `<strong>${fmtInt(p.km)} km</strong><br>${fmtDate(p.fecha)}` + (prev ? ` · +${fmtInt(p.km - prev.km)} km` : '');
+      tip.hidden = false;
+      const left = px * r.width / W, half = tip.offsetWidth / 2;
+      tip.style.left = Math.min(Math.max(left, half), r.width - half) + 'px';
+    };
+    const ocultar = () => { cross.setAttribute('visibility','hidden'); focus.setAttribute('visibility','hidden'); tip.hidden = true; };
+    plot.addEventListener('pointerdown', mostrar);
+    plot.addEventListener('pointermove', mostrar);
+    plot.addEventListener('pointerleave', ocultar);
   }
 
   function renderMantenimientoHistorial(){
