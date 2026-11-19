@@ -87,6 +87,22 @@
   .hero-next-sub{ font-size: 11px; opacity:.8; margin-top:2px; }
   .hero-note{ font-size: 10.5px; opacity:.75; margin-top: 8px; position:relative; z-index:1; }
 
+  /* ---- Registros pendientes (no confirmados en el Sheet) ---- */
+  .pendientes{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    margin: 12px 18px 0; padding: 10px 12px;
+    background:#FFF4E5; border:1px solid #F5C27A; border-radius: var(--radius);
+    font-size: 12.5px; color: var(--graphite);
+  }
+  .pendientes[hidden]{ display:none; }
+  .pendientes-btns{ display:flex; gap:6px; flex-shrink:0; }
+  .pendientes button{
+    min-height: 36px; padding: 0 12px; border-radius: 8px; border:none; cursor:pointer;
+    font-family:'Inter',sans-serif; font-weight:600; font-size: 12.5px;
+  }
+  .pendientes .btn-reintentar{ background: var(--honda-red); color: var(--white); }
+  .pendientes .btn-descartar{ background: transparent; color: var(--grey-mid); }
+
   /* ---- Tabs ---- */
   .tabs{
     display:flex; overflow-x:auto;
@@ -234,6 +250,14 @@
       <div class="hero-next-km" id="heroNextKm"></div>
     </div>
     <div class="hero-note" id="heroNote">Cargando datos…</div>
+  </div>
+
+  <div class="pendientes" id="pendientesBar" hidden>
+    <span id="pendientesText"></span>
+    <div class="pendientes-btns">
+      <button class="btn-descartar" id="btnDescartarPend">Descartar</button>
+      <button class="btn-reintentar" id="btnReintentarPend">Reintentar</button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -724,42 +748,132 @@
       DATA = await res.json();
       render();
       dot.className = 'conn-dot ok';
+      return true;
     }catch(err){
       const msg = err.name === 'AbortError' ? 'El Sheet está tardando demasiado — intenta de nuevo' : 'No se pudo cargar el Sheet — revisa la conexión';
       document.getElementById('heroNote').textContent = msg;
       dot.className = 'conn-dot error';
+      return false;
     }
   }
 
-  async function postEntry(tipo, fields, btnId){
+  /* ---------- Guardado verificado ---------- */
+  // Cada tipo: en qué lista del Sheet queda, qué campos son obligatorios y cómo reconocer el registro.
+  const TIPOS = {
+    tanqueo:       { lista: 'tanqueos',       nombre: 'Tanqueo',       obligatorios: ['Fecha','Odometro','ValorGastado'], clave: ['Odometro','ValorGastado'] },
+    odometro:      { lista: 'odometro',       nombre: 'Odómetro',      obligatorios: ['Fecha','Km'],                      clave: ['Km'] },
+    mantenimiento: { lista: 'mantenimientos', nombre: 'Mantenimiento', obligatorios: ['Fecha','Odometro'],                clave: ['Odometro'] }
+  };
+  const CAMPOS_NUMERICOS = ['Odometro','Km','ValorGastado','Valor'];
+  const PEND_KEY = 'nx190_pendientes';
+  let guardando = false;
+
+  // Acepta "45.000", "45,000" o "45000": deja solo los dígitos.
+  function limpiarNumero(v){ return String(v||'').replace(/[^\d]/g, ''); }
+
+  // Cuántas filas del Sheet coinciden con el registro (para confirmar que quedó guardado).
+  function contarCoincidencias(tipo, fields){
+    const t = TIPOS[tipo];
+    return (DATA[t.lista]||[]).filter(r => t.clave.every(c =>
+      CAMPOS_NUMERICOS.includes(c) ? num(r[c]) === num(fields[c]) : String(r[c]||'') === String(fields[c]||'')
+    )).length;
+  }
+
+  function leerPendientes(){
+    try{ return JSON.parse(localStorage.getItem(PEND_KEY)) || []; }catch(e){ return []; }
+  }
+  function escribirPendientes(lista){
+    try{ localStorage.setItem(PEND_KEY, JSON.stringify(lista)); }catch(e){}
+    renderPendientes();
+  }
+  function renderPendientes(){
+    const lista = leerPendientes();
+    document.getElementById('pendientesBar').hidden = !lista.length;
+    if(!lista.length) return;
+    const p = lista[0];
+    const detalle = p.tipo === 'tanqueo' ? `${fmtInt(p.fields.Odometro)} km · ${fmtMoney(p.fields.ValorGastado)}`
+                  : p.tipo === 'odometro' ? `${fmtInt(p.fields.Km)} km`
+                  : `${p.fields.Item} · ${fmtInt(p.fields.Odometro)} km`;
+    document.getElementById('pendientesText').textContent = lista.length === 1
+      ? `⚠️ ${TIPOS[p.tipo].nombre} sin guardar en el Sheet: ${detalle} (${fmtDate(toDate(p.fields.Fecha))})`
+      : `⚠️ ${lista.length} registros sin guardar en el Sheet`;
+  }
+
+  // Envía, recarga el Sheet y confirma que el registro aparece. Devuelve true solo si quedó guardado.
+  async function enviarYVerificar(tipo, fields){
+    const antes = contarCoincidencias(tipo, fields);
+    try{
+      await fetchWithTimeout(API_URL, { method: 'POST', body: new URLSearchParams({ tipo, ...fields }) }, 20000);
+    }catch(err){
+      // Si falla la respuesta (p. ej. por la red), igual puede haberse guardado: se verifica abajo.
+    }
+    if(!await fetchData()) return false;
+    return contarCoincidencias(tipo, fields) > antes;
+  }
+
+  async function postEntry(tipo, fields, btnId, idsALimpiar){
+    if(guardando) return;
     const btn = document.getElementById(btnId);
     const original = btn.textContent;
-    btn.textContent = 'Guardando…';
-    btn.disabled = true;
-    try{
-      const body = new URLSearchParams({ tipo, ...fields });
-      await fetchWithTimeout(API_URL, { method: 'POST', body }, 20000);
-      await fetchData();
-      btn.textContent = 'Guardado ✓';
-    }catch(err){
-      btn.textContent = err.name === 'AbortError' ? 'Tardó demasiado, reintenta' : 'Error, intenta de nuevo';
+    CAMPOS_NUMERICOS.forEach(c => { if(c in fields) fields[c] = limpiarNumero(fields[c]); });
+    const faltan = TIPOS[tipo].obligatorios.filter(c => !fields[c]);
+    if(faltan.length){
+      btn.textContent = 'Completa: ' + faltan.join(', ').replace('ValorGastado','Valor');
+      setTimeout(() => { btn.textContent = original; }, 2200);
+      return;
     }
-    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1800);
+    guardando = true;
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+    try{
+      if(await enviarYVerificar(tipo, fields)){
+        btn.textContent = 'Guardado ✓';
+        (idsALimpiar||[]).forEach(id => { document.getElementById(id).value = ''; });
+      }else{
+        escribirPendientes([...leerPendientes(), { tipo, fields }]);
+        btn.textContent = 'No se guardó en el Sheet';
+      }
+    }finally{
+      guardando = false;
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2200);
+    }
   }
+
+  document.getElementById('btnReintentarPend').addEventListener('click', async () => {
+    if(guardando) return;
+    const btn = document.getElementById('btnReintentarPend');
+    guardando = true; btn.disabled = true; btn.textContent = 'Enviando…';
+    try{
+      const quedan = [];
+      for(const p of leerPendientes()){
+        if(!await enviarYVerificar(p.tipo, p.fields)) quedan.push(p);
+      }
+      escribirPendientes(quedan);
+    }finally{
+      guardando = false; btn.disabled = false; btn.textContent = 'Reintentar';
+    }
+  });
+
+  document.getElementById('btnDescartarPend').addEventListener('click', () => {
+    const n = leerPendientes().length;
+    if(confirm(n === 1 ? '¿Descartar este registro? No se guardará en el Sheet.' : `¿Descartar los ${n} registros pendientes? No se guardarán en el Sheet.`)){
+      escribirPendientes([]);
+    }
+  });
 
   document.getElementById('btnTanqueo').addEventListener('click', () => {
     postEntry('tanqueo', {
       Fecha: document.getElementById('tqFecha').value,
       Odometro: document.getElementById('tqOdometro').value,
       ValorGastado: document.getElementById('tqValor').value
-    }, 'btnTanqueo');
+    }, 'btnTanqueo', ['tqOdometro','tqValor']);
   });
 
   document.getElementById('btnOdometro').addEventListener('click', () => {
     postEntry('odometro', {
       Fecha: document.getElementById('odFecha').value,
       Km: document.getElementById('odKm').value
-    }, 'btnOdometro');
+    }, 'btnOdometro', ['odKm']);
   });
 
   document.getElementById('btnMantenimiento').addEventListener('click', () => {
@@ -773,9 +887,10 @@
       Item: option.value,
       Valor: document.getElementById('manValor').value,
       Nota: document.getElementById('manNota').value
-    }, 'btnMantenimiento');
+    }, 'btnMantenimiento', ['manOdometro','manValor','manNota']);
   });
 
+  renderPendientes();
   fetchData();
 </script>
 </body>
