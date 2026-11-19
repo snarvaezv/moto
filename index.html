@@ -460,7 +460,7 @@
   function proximaTanqueada(){
     const costoKm = costoPorKmCombustible();
     const ultimo = (DATA.tanqueos||[])
-      .map(t => ({ km: num(t.Odometro), valor: num(t.ValorGastado) }))
+      .map(t => ({ km: num(t.Odometro), valor: num(t.ValorGastado), fecha: toDate(t.Fecha) }))
       .filter(t => t.km && t.valor)
       .sort((a,b) => b.km - a.km)[0];
     if(!costoKm || !ultimo) return null;
@@ -468,7 +468,7 @@
     const restanteKm = km - currentOdometer();
     const kmdia = kmPerDay();
     const fecha = kmdia > 0 && restanteKm > 0 ? new Date(Date.now() + (restanteKm / kmdia) * 86400000) : null;
-    return { km, restanteKm, fecha };
+    return { km, restanteKm, fecha, ultimo };
   }
   function costoPorKmCombustible(){
     const tramo = tramoCombustible();
@@ -550,7 +550,10 @@
       document.getElementById('heroNextKm').textContent = '≈ ' + fmtInt(prox.km) + ' km';
       document.getElementById('heroNextSub').textContent = prox.restanteKm > 0
         ? `Faltan ~${fmtInt(prox.restanteKm)} km` + (prox.fecha ? ` · ~${fmtDate(prox.fecha)}` : '')
-        : 'Ya deberías estar por tanquear';
+        // Pasados 50 km de la estimación, lo más probable es que falte registrar un tanqueo.
+        : prox.restanteKm > -50
+          ? 'Ya deberías estar por tanquear'
+          : `¿Ya tanqueaste? Último registro: ${prox.ultimo.fecha ? prox.ultimo.fecha.getDate() + ' ' + MESES[prox.ultimo.fecha.getMonth()] + ' · ' : ''}${fmtInt(prox.ultimo.km)} km`;
     }
     document.getElementById('heroNote').textContent = '*Estimado con precio de referencia $/galón (configurable)';
   }
